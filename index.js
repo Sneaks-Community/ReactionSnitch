@@ -12,7 +12,7 @@ bot.on("messageReactionAdd", (reaction, user) => {
     if (reaction.count == 1) {
         const embed = {
             "title": "Member has added a reaction",
-            "description": `${user} added the ${reaction.emoji.name} reaction to this [message](${reaction.message.url}).`,
+            "description": `${user} added the ${reaction.emoji.name} reaction to this [message](${reaction.message.url}) in ${message.channel}.`,
             "color": 9442302,
             "timestamp": Date.now(),
             "footer": {
