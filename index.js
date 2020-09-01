@@ -3,7 +3,7 @@ const bot = new Discord.Client();
 const config = require("./config.json");
 bot.login(config.token)
 
-const version = 1.1;
+const version = "1.1";
 
 bot.on("ready", () => {
     console.log(bot.user.tag)
