@@ -1,13 +1,11 @@
-const Discord = require("discord.js");
-const bot = new Discord.Client();
+const {Client, Intents} = require("discord.js");
+const bot = new Client({intents: [Intents.FLAGS.GUILD_MEMBERS, Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MESSAGE_REACTIONS]});
 const config = require("./config.json");
 bot.login(config.token)
 
-const version = "1.1";
-
 bot.on("ready", () => {
     console.log(bot.user.tag)
-    bot.user.setActivity(version)
+    bot.user.setActivity(require("./package.json").version)
 })
 
 bot.on("messageReactionAdd", (reaction, user) => {
@@ -30,7 +28,7 @@ bot.on("messageReactionAdd", (reaction, user) => {
             }
         };
 
-        bot.channels.cache.get(config.channelid).send({ embed })
+        bot.channels.cache.get(config.channelid).send({ embeds: [embed] })
 
     }
 })
