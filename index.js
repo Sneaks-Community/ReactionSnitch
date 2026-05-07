@@ -161,7 +161,7 @@ async function sendNotification(user, emoji, message) {
     .setTitle("Member has added a reaction")
     .setColor(9_442_302)
     .setAuthor({
-      iconURL: user.displayAvatarURL({ dynamic: true, size: 128 }),
+      iconURL: user.displayAvatarURL({ forceStatic: false, size: 128 }),
       name: user.tag,
     })
     .setDescription(
