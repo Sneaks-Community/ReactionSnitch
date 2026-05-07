@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log*
+.env
+.git
+.github
+.vscode
+README.md
+*.md
+plans
+eslint.config.js
+.nvmrc
+.nvm
