@@ -41,6 +41,7 @@ export default defineConfig([
     plugins: { n: node },
     rules: {
       ...nodeRecommended.rules,
+      "n/no-process-exit": "off",
       "n/no-unpublished-import": "off",
       "n/prefer-node-protocol": "error",
     },
@@ -55,6 +56,7 @@ export default defineConfig([
       ...unicornRecommended.rules,
       "unicorn/no-abusive-eslint-disable": "off",
       "unicorn/no-nested-ternary": "off",
+      "unicorn/no-process-exit": "off",
     },
   },
 

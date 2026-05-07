@@ -342,8 +342,10 @@ const shutdown = async (signal) => {
   try {
     await bot.destroy();
     logger.info("Bot disconnected.");
+    process.exit(0);
   } catch (error) {
     logger.fatal({ err: error }, `Error during shutdown: ${error.message}`);
+    process.exit(1);
   }
 };
 
