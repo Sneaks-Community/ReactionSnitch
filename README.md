@@ -46,6 +46,7 @@ Edit `.env` and fill in your values:
 DISCORD_TOKEN=your_bot_token_here
 CHANNEL_ID=your_notification_channel_id_here
 LOG_LEVEL=info
+EMBED_COLOR=#your_preferred_hex_color
 ```
 
 | Variable | Required | Description |

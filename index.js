@@ -157,9 +157,13 @@ async function sendNotification(user, emoji, message) {
     ? `<:${emoji.name}:${emoji.id}>`
     : emoji.name;
 
+  const embedColor = process.env.EMBED_COLOR
+    ? Number.parseInt(process.env.EMBED_COLOR.replace("#", ""), 16)
+    : 9_442_302;
+
   const embed = new EmbedBuilder()
     .setTitle("Member has added a reaction")
-    .setColor(9_442_302)
+    .setColor(embedColor)
     .setAuthor({
       iconURL: user.displayAvatarURL({ forceStatic: false, size: 128 }),
       name: user.tag,
