@@ -1,6 +1,6 @@
 {
   "name": "reactionsnitch",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "A Discord bot that posts notifications to a specified channel when someone reacts to a message.",
   "type": "module",
   "main": "index.js",
