@@ -10,6 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pino from "pino";
 
+import { server as healthServer } from "./healthcheck.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -340,6 +342,10 @@ const shutdown = async (signal) => {
 
   logger.info({ signal }, `Received ${signal}. Shutting down gracefully...`);
   try {
+    // Close health server first
+    await new Promise((resolve) => {
+      healthServer.close(() => resolve());
+    });
     await bot.destroy();
     logger.info("Bot disconnected.");
     process.exit(0);
