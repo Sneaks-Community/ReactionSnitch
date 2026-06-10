@@ -38,7 +38,7 @@ ENV NODE_ENV=production
 LABEL org.opencontainers.image.title="ReactionSnitch"
 LABEL org.opencontainers.image.description="A Discord bot that posts notifications when someone reacts to a message"
 LABEL org.opencontainers.image.source="https://github.com/Sneaks-Community/ReactionSnitch"
-LABEL org.opencontainers.image.version="3.1.1"
+LABEL org.opencontainers.image.version="3.2.0"
 LABEL org.opencontainers.image.authors="Sneak's Community"
 
 # Healthcheck: ping the bot's health endpoint every 30s
