@@ -3,6 +3,7 @@ import {
   Events,
   GatewayIntentBits,
   Client,
+  Partials,
 } from "discord.js";
 import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
@@ -62,6 +63,10 @@ const bot = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMessageReactions,
   ],
+  // Partials let MessageReactionAdd fire for reactions on uncached (older)
+  // messages, not just messages cached since startup. Without these, reactions
+  // on old messages would be silently dropped.
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 });
 
 bot.on(Events.ClientReady, (client) => {
@@ -117,9 +122,10 @@ process.on("unhandledRejection", (reason) => {
   logger.error({ reason }, "Unhandled Rejection");
 });
 
-// Deduplication set to prevent duplicate notifications when both the
-// MessageReactionAdd event and raw handler fire for the same reaction.
-// Keys are formatted as "messageId:user_id:emojiName:emojiId".
+// Deduplication set guarding against the same reaction event being processed
+// more than once (e.g. a duplicate gateway delivery after a resume), which would
+// otherwise send a second notification for the same first reaction.
+// Keys are formatted as "messageId:userId:emojiName:emojiId".
 const processedReactions = new Set();
 
 function shouldProcessReaction(messageId, userId, emojiName, emojiId) {
@@ -205,7 +211,9 @@ async function sendNotification(user, emoji, message) {
   }
 }
 
-// Handle MESSAGE_REACTION_ADD event — only notifies on the first reaction (count === 1)
+// Handle MESSAGE_REACTION_ADD event — only notifies on the first reaction of
+// each emoji (reaction.count === 1). Partials are enabled (see Client config)
+// so this fires for reactions on uncached/older messages too.
 bot.on(Events.MessageReactionAdd, async (reaction, user) => {
   try {
     // Skip bots
@@ -214,37 +222,21 @@ bot.on(Events.MessageReactionAdd, async (reaction, user) => {
       return;
     }
 
-    // Always create dedup key for all reactions to prevent Raw handler from
-    // processing subsequent reactions that fail the count check.
-    if (!shouldProcessReaction(reaction.message.id, user.id, reaction.emoji.name, reaction.emoji.id)) {
-      logger.debug(
-        { emojiId: reaction.emoji.id, emojiName: reaction.emoji.name, messageId: reaction.message.id, userId: user.id },
-        "ReactionAdd: Duplicate — skipping",
-      );
-      return;
+    // Reactions on uncached messages arrive as partials with a null count.
+    // Fetch to populate reaction.count from Discord's API before the count check.
+    if (reaction.partial) {
+      try {
+        await reaction.fetch();
+      } catch (fetchError) {
+        logger.error(
+          { err: fetchError.message },
+          "ReactionAdd: Failed to fetch partial reaction",
+        );
+        return;
+      }
     }
 
-    // Check if count is available (requires GUILD_MESSAGE_REACTIONS privileged intent)
-    if (reaction.count === undefined || reaction.count === null) {
-      logger.error(
-        { count: reaction.count },
-        "ReactionAdd: reaction.count is undefined — GUILD_MESSAGE_REACTIONS privileged intent must be enabled",
-      );
-      return;
-    }
-
-    // Wait for the reaction to be fully synced with Discord's API
-    try {
-      await reaction.fetch();
-    } catch (fetchError) {
-      logger.error(
-        { err: fetchError.message },
-        "ReactionAdd: reaction.fetch() failed — ensure GUILD_MESSAGE_REACTIONS privileged intent is enabled",
-      );
-      return;
-    }
-
-    // Only notify on the first reaction to avoid duplicate notifications
+    // Only notify on the first reaction of each emoji.
     if (reaction.count !== 1) {
       logger.debug(
         { count: reaction.count },
@@ -253,81 +245,19 @@ bot.on(Events.MessageReactionAdd, async (reaction, user) => {
       return;
     }
 
+    // Guard against the same first reaction being processed twice
+    // (e.g. a duplicate gateway delivery after a resume).
+    if (!shouldProcessReaction(reaction.message.id, user.id, reaction.emoji.name, reaction.emoji.id)) {
+      logger.debug(
+        { emojiId: reaction.emoji.id, emojiName: reaction.emoji.name, messageId: reaction.message.id, userId: user.id },
+        "ReactionAdd: Duplicate — skipping",
+      );
+      return;
+    }
+
     await sendNotification(user, reaction.emoji, reaction.message);
   } catch (error) {
     logger.error({ err: error.message }, "ReactionAdd: Unexpected error");
-  }
-});
-
-// Raw event handler as fallback for when GUILD_MESSAGE_REACTIONS privileged intent is NOT enabled.
-// This catches reactions that the MessageReactionAdd event cannot provide count data for.
-bot.on(Events.Raw, async (data) => {
-  if (data.t !== "MESSAGE_REACTION_ADD") return;
-
-  const d = data.d;
-  if (!d) return;
-
-  const messageId = d.message_id;
-  const userId = d.user_id;
-  const emojiName = d.emoji?.name || "";
-  const emojiId = d.emoji?.id || undefined;
-  const emojiAnimated = d.emoji?.animated || false;
-  const guildId = d.guild_id;
-  const channelId = d.channel_id;
-
-  // Deduplication check
-  if (!shouldProcessReaction(messageId, userId, emojiName, emojiId)) {
-    logger.debug({ emojiId, emojiName, messageId, userId }, "RawReaction: Duplicate — skipping");
-    return;
-  }
-
-  try {
-    // Fetch the channel
-    let channel = bot.channels.cache.get(channelId);
-    if (!channel && guildId) {
-      const guild = bot.guilds.cache.get(guildId);
-      if (guild) {
-        channel = await guild.channels.fetch(channelId).catch(() => {});
-      }
-    }
-
-    if (!channel) {
-      logger.error({ channelId }, "RawReaction: Could not find channel");
-      return;
-    }
-
-    // Fetch the message from API
-    let message;
-    try {
-      message = await channel.messages.fetch(messageId);
-    } catch {
-      logger.error({ channelId, messageId }, "RawReaction: Could not fetch message");
-      return;
-    }
-
-    // Fetch the user
-    let user = bot.users.cache.get(userId);
-    if (!user) {
-      try {
-        user = await bot.users.fetch(userId);
-      } catch {
-        logger.error({ userId }, "RawReaction: Could not fetch user");
-        return;
-      }
-    }
-
-    // Skip bots
-    if (user.bot) {
-      logger.debug({ userTag: user.tag }, "RawReaction: Skipping bot reaction");
-      return;
-    }
-
-    logger.debug({ messageId, userId, userTag: user.tag }, "RawReaction: Processing reaction");
-
-    const emoji = { animated: emojiAnimated, id: emojiId, name: emojiName };
-    await sendNotification(user, emoji, message);
-  } catch (error) {
-    logger.error({ err: error.message, messageId }, "RawReaction: Unexpected error");
   }
 });
 
