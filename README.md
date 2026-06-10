@@ -22,10 +22,7 @@ A Discord bot that posts notifications to a specified channel when someone adds 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications).
 2. Click **New Application**, give it a name, and create it.
 3. Navigate to the **Bot** section and click **Add Bot**.
-4. Under **Privileged Gateway Intents**, enable:
-   - **Guild Messages** intent
-   - **Guild Message Reactions** intent
-5. Copy the **Token** — you will need it for the `.env` file.
+4. Copy the **Token** — you will need it for the `.env` file.
 
 ### 2. Get a Channel ID
 
@@ -47,13 +44,16 @@ DISCORD_TOKEN=your_bot_token_here
 CHANNEL_ID=your_notification_channel_id_here
 LOG_LEVEL=info
 EMBED_COLOR=#your_preferred_hex_color
+HEALTH_PORT=3000
 ```
 
 | Variable | Required | Description |
-|----------|----------|-------------|
+| --- | --- | --- |
 | `DISCORD_TOKEN` | Yes | Your Discord bot token |
 | `CHANNEL_ID` | Yes | The channel ID where notifications will be sent |
 | `LOG_LEVEL` | No | Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `info`) |
+| `EMBED_COLOR` | No | Hex color for the notification embed, e.g. `#8B9D4F` (default: `#9013FE`) |
+| `HEALTH_PORT` | No | Port for the HTTP health check server (default: `3000`) |
 
 ### 4. Install Dependencies
 
