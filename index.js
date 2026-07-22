@@ -111,11 +111,47 @@ bot.on(Events.ClientError, (error) => {
   logger.error({ message: error.message }, `Bot Error: ${error.message}`);
 });
 
-// Handle WebSocket/shard errors — per discord.js production best practices.
-// These errors (ECONNRESET, ETIMEDOUT) can cause silent disconnections
-// if not explicitly handled.
+// Handle WebSocket/shard errors. These are transient connectivity blips
+// (handshake timeouts, DNS failures, 5xx from the gateway) that djs
+// recovers from on its own via automatic reconnect
 bot.on(Events.ShardError, (error) => {
-  logger.error({ message: error.message }, `Shard Error: ${error.message}`);
+  logger.warn(
+    { message: error.message },
+    `Shard Error (transient — discord.js will auto-retry): ${error.message}`,
+  );
+});
+
+// Connection lifecycle logging
+bot.on(Events.ShardDisconnect, (event, shardId) => {
+  logger.warn(
+    { code: event.code, shardId },
+    `Shard ${shardId} disconnected (code ${event.code})`,
+  );
+});
+
+bot.on(Events.ShardReconnecting, (shardId) => {
+  logger.warn({ shardId }, `Shard ${shardId} reconnecting`);
+});
+
+bot.on(Events.ShardResume, (shardId, replayedEvents) => {
+  logger.info(
+    { replayedEvents, shardId },
+    `Shard ${shardId} resumed (${replayedEvents} events replayed)`,
+  );
+});
+
+bot.on(Events.ShardReady, (shardId) => {
+  logger.info({ shardId }, `Shard ${shardId} ready`);
+});
+
+// Throw fatal error and exit on a permanently invalidated session
+// (bad token, disallowed intents, or an unrecoverable session state)
+bot.on(Events.Invalidated, () => {
+  logger.fatal(
+    {},
+    "Session invalidated and unrecoverable — exiting to trigger restart.",
+  );
+  process.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
