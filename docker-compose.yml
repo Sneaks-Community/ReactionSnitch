@@ -3,6 +3,7 @@ services:
     image: ghcr.io/sneaks-community/reactionsnitch:latest
     container_name: reactionsnitch
     restart: unless-stopped
+    read_only: true
     env_file:
       - .env
     environment:
