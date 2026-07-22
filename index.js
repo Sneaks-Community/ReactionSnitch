@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pino from "pino";
 
-import { server as healthServer } from "./healthcheck.js";
+import { startHealthServer } from "./healthcheck.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,19 +30,17 @@ const logger = pino({
   },
   level: process.env.LOG_LEVEL || "info",
   timestamp: pino.stdTimeFunctions.isoTime,
-  ...(isProduction
-    ? {}
-    : {
-        transport: {
-          options: {
-            colorize: true,
-            ignore: "pid,hostname",
-            singleLine: false,
-            translateTime: "mm-dd-yyyy HH:MM:ss Z",
-          },
-          target: "pino-pretty",
-        },
-      }),
+  ...(!isProduction && {
+    transport: {
+      options: {
+        colorize: true,
+        ignore: "pid,hostname",
+        singleLine: false,
+        translateTime: "mm-dd-yyyy HH:MM:ss Z",
+      },
+      target: "pino-pretty",
+    },
+  }),
 });
 
 // Validate required environment variables after logger initialization
@@ -56,6 +54,8 @@ if (!process.env.DISCORD_TOKEN || !process.env.CHANNEL_ID) {
     "Missing required environment variables: DISCORD_TOKEN and CHANNEL_ID must be set in the .env file.",
   );
 }
+
+const healthServer = startHealthServer();
 
 const bot = new Client({
   intents: [
@@ -139,10 +139,10 @@ function shouldProcessReaction(messageId, userId, emojiName, emojiId) {
 // We clear the entire set periodically. This is safe because reactions are
 // processed within seconds of occurring.
 setInterval(() => {
-  if (processedReactions.size > 10_000) {
-    processedReactions.clear();
-    logger.debug("Cleared deduplication set (size > 10000)");
-  }
+  if (processedReactions.size <= 10_000) return;
+
+  processedReactions.clear();
+  logger.debug("Cleared deduplication set (size > 10000)");
 }, 5 * 60 * 1000);
 
 // Resolve the notification channel, falling back to API fetch if not in cache.
@@ -264,11 +264,11 @@ bot.on(Events.MessageReactionAdd, async (reaction, user) => {
 bot.login(process.env.DISCORD_TOKEN);
 
 // Graceful shutdown
-let isShuttingDown = false;
+const shutdownState = { inProgress: false };
 
 const shutdown = async (signal) => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
+  if (shutdownState.inProgress) return;
+  shutdownState.inProgress = true;
 
   logger.info({ signal }, `Received ${signal}. Shutting down gracefully...`);
   try {

@@ -11,28 +11,38 @@ const logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
 });
 
-const server = http.createServer((_request, response) => {
-  response.writeHead(200, { 'Content-Type': 'application/json' });
-  response.end(
-    JSON.stringify({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-    }),
-  );
-});
+function startHealthServer() {
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(
+      JSON.stringify({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+      }),
+    );
+  });
 
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    logger.error({ port: PORT }, `Health check port ${PORT} is already in use`);
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      logger.error(
+        { port: PORT },
+        `Health check port ${PORT} is already in use`,
+      );
+      process.exit(1);
+    }
+    logger.error(
+      { err: error.message, port: PORT },
+      'Health check server error',
+    );
     process.exit(1);
-  }
-  logger.error({ err: error.message, port: PORT }, 'Health check server error');
-  process.exit(1);
-});
+  });
 
-server.listen(PORT, '127.0.0.1', () => {
-  logger.info({ port: PORT }, 'Health check server started');
-});
+  server.listen(PORT, '127.0.0.1', () => {
+    logger.info({ port: PORT }, 'Health check server started');
+  });
 
-export { server };
+  return server;
+}
+
+export { startHealthServer };
