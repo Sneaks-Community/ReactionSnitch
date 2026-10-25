@@ -162,7 +162,7 @@ process.on("unhandledRejection", (reason) => {
 const processedReactions = new Set();
 
 function shouldProcessReaction(messageId, userId, emojiName, emojiId) {
-  const key = `${messageId}:${userId}:${emojiName}:${emojiId || ""}`;
+  const key = `${messageId}:${userId}:${emojiName}:${emojiId}`;
   if (processedReactions.has(key)) return false;
   processedReactions.add(key);
   return true;
