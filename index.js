@@ -5,7 +5,6 @@ import {
   Client,
   Partials,
 } from "discord.js";
-import dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,8 +18,6 @@ const __dirname = path.dirname(__filename);
 const packageData = JSON.parse(
   readFileSync(path.join(__dirname, "package.json"), "utf8"),
 );
-
-dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
 
