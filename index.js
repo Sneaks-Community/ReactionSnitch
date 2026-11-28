@@ -308,9 +308,11 @@ async function connect() {
 // Graceful shutdown
 const shutdownState = { inProgress: false };
 
-const shutdown = async (signal) => {
+const shutdown = async (signal, exitCode = 0) => {
   if (shutdownState.inProgress) return;
   shutdownState.inProgress = true;
+  // Force exit if graceful shutdown hangs; unref so it never delays a clean exit.
+  setTimeout(() => process.exit(1), 5000).unref();
 
   logger.info({ signal }, `Received ${signal}. Shutting down gracefully...`);
   try {
@@ -320,7 +322,7 @@ const shutdown = async (signal) => {
     });
     await bot.destroy();
     logger.info("Bot disconnected.");
-    process.exit(0);
+    process.exit(exitCode);
   } catch (error) {
     logger.fatal({ err: error }, `Error during shutdown: ${error.message}`);
     process.exit(1);
@@ -331,11 +333,8 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
 process.on("uncaughtException", (error) => {
-  logger.fatal(
-    { err: error.message, stack: error.stack },
-    "Uncaught Exception — shutting down",
-  );
-  shutdown("uncaughtException");
+  logger.fatal({ err: error }, "Uncaught exception, shutting down");
+  shutdown("uncaughtException", 1);
 });
 
 if (!parked.reason) await connect();
