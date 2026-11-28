@@ -40,8 +40,8 @@ LABEL org.opencontainers.image.description="A Discord bot that posts notificatio
 LABEL org.opencontainers.image.source="https://github.com/Sneaks-Community/ReactionSnitch"
 LABEL org.opencontainers.image.authors="Sneak's Community"
 
-# Healthcheck: ping the bot's health endpoint every 30s
+# Shell form so HEALTH_PORT from the runtime env is expanded; 503 while parked marks the container unhealthy.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider "http://127.0.0.1:${HEALTH_PORT:-3000}/" || exit 1
 
 CMD ["node", "index.js"]
