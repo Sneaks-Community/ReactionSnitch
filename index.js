@@ -91,17 +91,6 @@ if (process.env.EMBED_COLOR) {
 
 bot.on(Events.ClientReady, (client) => {
   logger.info({ tag: client.user.tag }, `Ready as ${client.user.tag}`);
-  logger.debug({
-    intents: {
-      GuildMessageReactions: true,
-      GuildMessages: true,
-      Guilds: true,
-    },
-  }, "Intents enabled: Guilds, GuildMessages, GuildMessageReactions");
-  logger.debug(
-    {},
-    'Make sure "GUILD_MESSAGE_REACTIONS" privileged intent is enabled in Discord Developer Portal > Bot > Privileged Gateway Intents',
-  );
 
   // Verify notification channel accessibility on startup
   const notifChannel = client.channels.cache.get(process.env.CHANNEL_ID);
@@ -221,7 +210,6 @@ async function getNotificationChannel(client) {
   }
 }
 
-// Shared notification function used by both MessageReactionAdd and raw handlers
 async function sendNotification(user, emoji, message) {
   const embed = new EmbedBuilder()
     .setTitle("Member has added a reaction")
