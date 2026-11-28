@@ -3,6 +3,7 @@ import {
   Events,
   GatewayIntentBits,
   Client,
+  Options,
   Partials,
   resolveColor,
   Routes,
@@ -57,6 +58,12 @@ const bot = new Client({
   // messages, not just messages cached since startup. Without these, reactions
   // on old messages would be silently dropped.
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  // Expire cached messages so idle channels don't pin 200 messages each forever;
+  // reactions on expired messages fall back to the partial fetch.
+  sweepers: {
+    ...Options.DefaultSweeperSettings,
+    messages: { interval: 600, lifetime: 1800 },
+  },
 });
 
 // Permanent failure: stay alive and idle rather than exit, so no supervisor restart-loops the bot.
