@@ -89,30 +89,32 @@ if (process.env.EMBED_COLOR) {
   }
 }
 
-bot.on(Events.ClientReady, (client) => {
+// Holds the notification channel once it passes the ready check.
+const notification = {};
+
+bot.on(Events.ClientReady, async (client) => {
   logger.info({ tag: client.user.tag }, `Ready as ${client.user.tag}`);
 
-  // Verify notification channel accessibility on startup
-  const notifChannel = client.channels.cache.get(process.env.CHANNEL_ID);
-  if (notifChannel) {
-    const hasPermission = notifChannel.permissionsFor(client.user).has(["SendMessages"]);
-    if (hasPermission) {
-      logger.info(
-        { channelId: process.env.CHANNEL_ID },
-        "Notification channel verified and accessible",
-      );
-    } else {
-      logger.warn(
-        { channelId: process.env.CHANNEL_ID },
-        "Notification channel exists but bot lacks SendMessages permission",
-      );
-    }
-  } else {
-    logger.warn(
-      { channelId: process.env.CHANNEL_ID },
-      "Notification channel not found in cache — it may be in a guild the bot is not yet aware of",
-    );
+  // Guild channels are cached at ready, so this usually verifies synchronously,
+  // before discord.js replays queued reaction events.
+  const id = process.env.CHANNEL_ID;
+  let channel;
+  try {
+    channel = client.channels.cache.get(id) ?? (await client.channels.fetch(id));
+  } catch (error) {
+    return park(`Cannot fetch notification channel ${id}`, error);
   }
+  if (!channel?.isSendable() || !channel.permissionsFor) {
+    return park(`Notification channel ${id} is not a server channel the bot can post in`);
+  }
+  const required = ["ViewChannel", channel.isThread() ? "SendMessagesInThreads" : "SendMessages", "EmbedLinks"];
+  const missing = channel.permissionsFor(client.user)?.missing(required) ?? required;
+  if (missing.length > 0) {
+    return park(`Bot lacks ${missing.join(", ")} in notification channel ${id}`);
+  }
+
+  notification.channel = channel;
+  logger.info({ channelId: id, guildId: channel.guildId }, "Notification channel verified");
 });
 
 bot.on(Events.ClientError, (error) => {
@@ -196,20 +198,6 @@ setInterval(() => {
   logger.debug("Cleared deduplication set (size > 10000)");
 }, 5 * 60 * 1000);
 
-// Resolve the notification channel, falling back to API fetch if not in cache.
-// This handles reconnection scenarios where the channel cache may be empty.
-async function getNotificationChannel(client) {
-  let channel = client.channels.cache.get(process.env.CHANNEL_ID);
-  if (channel) return channel;
-
-  try {
-    channel = await client.channels.fetch(process.env.CHANNEL_ID);
-    return channel;
-  } catch {
-    // Channel not found — caller checks with `if (!channel)`
-  }
-}
-
 async function sendNotification(user, emoji, message) {
   const embed = new EmbedBuilder()
     .setTitle("Member has added a reaction")
@@ -251,17 +239,14 @@ async function sendFloodNotice(user) {
 }
 
 async function postEmbed(embed) {
-  const notifChannel = await getNotificationChannel(bot);
-  if (!notifChannel) {
-    logger.error(
-      { channelId: process.env.CHANNEL_ID },
-      "ReactionAdd: Could not find notification channel",
-    );
+  // Unset until the ready check passes; reachable only when that check had to fetch the channel.
+  if (!notification.channel) {
+    logger.warn({ channelId: process.env.CHANNEL_ID }, "Notification channel not verified; dropping notification");
     return;
   }
 
   try {
-    await notifChannel.send({ embeds: [embed] });
+    await notification.channel.send({ embeds: [embed] });
     logger.debug(
       { channelId: process.env.CHANNEL_ID },
       "ReactionAdd: Message sent successfully",
