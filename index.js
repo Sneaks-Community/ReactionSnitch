@@ -222,10 +222,6 @@ async function getNotificationChannel(client) {
 
 // Shared notification function used by both MessageReactionAdd and raw handlers
 async function sendNotification(user, emoji, message) {
-  const emojiDisplay = emoji.id
-    ? `<:${emoji.name}:${emoji.id}>`
-    : emoji.name;
-
   const embed = new EmbedBuilder()
     .setTitle("Member has added a reaction")
     .setColor(embedColor)
@@ -234,7 +230,7 @@ async function sendNotification(user, emoji, message) {
       name: user.tag,
     })
     .setDescription(
-      `${user} added the ${emojiDisplay} reaction to this [message](${message.url}) in ${message.channel}.`,
+      `${user} added the ${emoji} reaction to this [message](${message.url}) in ${message.channel}.`,
     )
     .setFooter({ text: `ID: ${user.id}` })
     .setTimestamp();
