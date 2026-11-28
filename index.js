@@ -137,11 +137,11 @@ bot.on(Events.ShardDisconnect, ({ code }, shardId) => {
 });
 
 bot.on(Events.ShardReconnecting, (shardId) => {
-  logger.warn({ shardId }, `Shard ${shardId} reconnecting`);
+  logger.debug({ shardId }, `Shard ${shardId} reconnecting`);
 });
 
 bot.on(Events.ShardResume, (shardId, replayedEvents) => {
-  logger.info(
+  logger.debug(
     { replayedEvents, shardId },
     `Shard ${shardId} resumed (${replayedEvents} events replayed)`,
   );
