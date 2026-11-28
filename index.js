@@ -108,7 +108,7 @@ bot.on(Events.ClientReady, (client) => {
 });
 
 bot.on(Events.ClientError, (error) => {
-  logger.error({ message: error.message }, `Bot Error: ${error.message}`);
+  logger.error({ err: error }, `Bot Error: ${error.message}`);
 });
 
 // Handle WebSocket/shard errors. These are transient connectivity blips
@@ -116,7 +116,7 @@ bot.on(Events.ClientError, (error) => {
 // recovers from on its own via automatic reconnect
 bot.on(Events.ShardError, (error) => {
   logger.warn(
-    { message: error.message },
+    { err: error },
     `Shard Error (transient — discord.js will auto-retry): ${error.message}`,
   );
 });
@@ -142,7 +142,7 @@ bot.on(Events.ShardReady, (shardId) => {
 });
 
 process.on("unhandledRejection", (reason) => {
-  logger.error({ reason }, "Unhandled Rejection");
+  logger.error({ err: reason }, "Unhandled Rejection");
 });
 
 // Deduplication set guarding against the same reaction event being processed
@@ -228,7 +228,7 @@ async function sendNotification(user, emoji, message) {
     );
   } catch (sendError) {
     logger.error(
-      { channelId: process.env.CHANNEL_ID, err: sendError.message },
+      { channelId: process.env.CHANNEL_ID, err: sendError },
       "ReactionAdd: Failed to send notification",
     );
   }
@@ -252,7 +252,7 @@ bot.on(Events.MessageReactionAdd, async (reaction, user) => {
         await reaction.fetch();
       } catch (fetchError) {
         logger.error(
-          { err: fetchError.message },
+          { err: fetchError },
           "ReactionAdd: Failed to fetch partial reaction",
         );
         return;
@@ -280,7 +280,7 @@ bot.on(Events.MessageReactionAdd, async (reaction, user) => {
 
     await sendNotification(user, reaction.emoji, reaction.message);
   } catch (error) {
-    logger.error({ err: error.message }, "ReactionAdd: Unexpected error");
+    logger.error({ err: error }, "ReactionAdd: Unexpected error");
   }
 });
 
