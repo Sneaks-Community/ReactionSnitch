@@ -46,7 +46,7 @@ const logger = pino({
 
 // Set when parked; the health endpoint reports it as a 503.
 const parked = {};
-const healthServer = startHealthServer(() => parked.reason);
+const healthServer = startHealthServer(logger, () => parked.reason);
 
 const bot = new Client({
   intents: [

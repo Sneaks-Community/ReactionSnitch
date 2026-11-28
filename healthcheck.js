@@ -1,17 +1,8 @@
 import http from 'node:http';
-import pino from 'pino';
 
 const PORT = process.env.HEALTH_PORT || 3000;
 
-const logger = pino({
-  formatters: {
-    level: (label) => ({ level: label.toUpperCase() }),
-  },
-  level: process.env.LOG_LEVEL || 'info',
-  timestamp: pino.stdTimeFunctions.isoTime,
-});
-
-function startHealthServer(getParkedReason) {
+function startHealthServer(logger, getParkedReason) {
   const server = http.createServer((_request, response) => {
     const reason = getParkedReason();
     response.writeHead(reason ? 503 : 200, { 'Content-Type': 'application/json' });
@@ -34,7 +25,7 @@ function startHealthServer(getParkedReason) {
       process.exit(1);
     }
     logger.error(
-      { err: error.message, port: PORT },
+      { err: error, port: PORT },
       'Health check server error',
     );
     process.exit(1);
