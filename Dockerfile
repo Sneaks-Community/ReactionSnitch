@@ -23,13 +23,8 @@ COPY --from=deps /app/package.json ./package.json
 COPY index.js ./index.js
 COPY healthcheck.js ./healthcheck.js
 
-# Create non-root system user for security
-RUN addgroup --system --gid 1001 appuser && \
-    adduser --system --uid 1001 appuser && \
-    chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
+# Base image's non-root user; app files stay root-owned so the process can't modify them.
+USER node
 
 # Set production environment
 ENV NODE_ENV=production
