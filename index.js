@@ -121,12 +121,9 @@ bot.on(Events.ShardError, (error) => {
   );
 });
 
-// Connection lifecycle logging
-bot.on(Events.ShardDisconnect, (event, shardId) => {
-  logger.warn(
-    { code: event.code, shardId },
-    `Shard ${shardId} disconnected (code ${event.code})`,
-  );
+// discord.js emits this only for close codes it won't reconnect from (bad token, disallowed intents).
+bot.on(Events.ShardDisconnect, ({ code }, shardId) => {
+  park(`Gateway closed shard ${shardId} with fatal code ${code}`);
 });
 
 bot.on(Events.ShardReconnecting, (shardId) => {
@@ -142,16 +139,6 @@ bot.on(Events.ShardResume, (shardId, replayedEvents) => {
 
 bot.on(Events.ShardReady, (shardId) => {
   logger.info({ shardId }, `Shard ${shardId} ready`);
-});
-
-// Throw fatal error and exit on a permanently invalidated session
-// (bad token, disallowed intents, or an unrecoverable session state)
-bot.on(Events.Invalidated, () => {
-  logger.fatal(
-    {},
-    "Session invalidated and unrecoverable — exiting to trigger restart.",
-  );
-  process.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
