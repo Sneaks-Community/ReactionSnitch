@@ -4,9 +4,11 @@ import {
   GatewayIntentBits,
   Client,
   Partials,
+  Routes,
 } from "discord.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import pino from "pino";
 
@@ -40,19 +42,9 @@ const logger = pino({
   }),
 });
 
-// Validate required environment variables after logger initialization
-// so that startup failures produce structured log output
-if (!process.env.DISCORD_TOKEN || !process.env.CHANNEL_ID) {
-  logger.error(
-    {},
-    "Missing required environment variables: DISCORD_TOKEN and CHANNEL_ID must be set in the .env file.",
-  );
-  throw new Error(
-    "Missing required environment variables: DISCORD_TOKEN and CHANNEL_ID must be set in the .env file.",
-  );
-}
-
-const healthServer = startHealthServer();
+// Set when parked; the health endpoint reports it as a 503.
+const parked = {};
+const healthServer = startHealthServer(() => parked.reason);
 
 const bot = new Client({
   intents: [
@@ -65,6 +57,17 @@ const bot = new Client({
   // on old messages would be silently dropped.
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 });
+
+// Permanent failure: stay alive and idle rather than exit, so no supervisor restart-loops the bot.
+function park(reason, error) {
+  parked.reason = reason;
+  logger.fatal({ err: error }, `${reason}. Not retrying; fix the configuration and restart.`);
+  bot.destroy();
+}
+
+if (!process.env.DISCORD_TOKEN || !process.env.CHANNEL_ID) {
+  park("Missing DISCORD_TOKEN or CHANNEL_ID");
+}
 
 bot.on(Events.ClientReady, (client) => {
   logger.info({ tag: client.user.tag }, `Ready as ${client.user.tag}`);
@@ -294,7 +297,26 @@ bot.on(Events.MessageReactionAdd, async (reaction, user) => {
   }
 });
 
-bot.login(process.env.DISCORD_TOKEN);
+// A failed login() leaves the client permanently destroyed, so retry a REST pre-check and call login() once.
+// ponytail: a failure inside login() parks; upgrade path is a fresh Client per attempt.
+async function connect() {
+  bot.rest.setToken(process.env.DISCORD_TOKEN);
+  for (let delay = 5000; ; delay = Math.min(delay * 2, 300_000)) {
+    try {
+      await bot.rest.get(Routes.gatewayBot());
+      break;
+    } catch (error) {
+      if (error.status === 401) return park("Discord rejected DISCORD_TOKEN", error);
+      logger.warn({ err: error, retryInMs: delay }, "Discord unreachable, retrying");
+      await sleep(delay);
+    }
+  }
+  try {
+    await bot.login(process.env.DISCORD_TOKEN);
+  } catch (error) {
+    park("Login failed after Discord was reachable", error);
+  }
+}
 
 // Graceful shutdown
 const shutdownState = { inProgress: false };
@@ -328,3 +350,5 @@ process.on("uncaughtException", (error) => {
   );
   shutdown("uncaughtException");
 });
+
+if (!parked.reason) await connect();

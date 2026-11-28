@@ -11,12 +11,14 @@ const logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
 });
 
-function startHealthServer() {
+function startHealthServer(getParkedReason) {
   const server = http.createServer((_request, response) => {
-    response.writeHead(200, { 'Content-Type': 'application/json' });
+    const reason = getParkedReason();
+    response.writeHead(reason ? 503 : 200, { 'Content-Type': 'application/json' });
     response.end(
       JSON.stringify({
-        status: 'healthy',
+        reason,
+        status: reason ? 'parked' : 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
       }),
