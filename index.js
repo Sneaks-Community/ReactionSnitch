@@ -58,6 +58,8 @@ const bot = new Client({
   // messages, not just messages cached since startup. Without these, reactions
   // on old messages would be silently dropped.
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  // Sent with every identify, so the status survives full reconnects (setActivity would not).
+  presence: { activities: [{ name: packageData.version }] },
   // Expire cached messages so idle channels don't pin 200 messages each forever;
   // reactions on expired messages fall back to the partial fetch.
   sweepers: {
@@ -100,7 +102,6 @@ bot.on(Events.ClientReady, (client) => {
     {},
     'Make sure "GUILD_MESSAGE_REACTIONS" privileged intent is enabled in Discord Developer Portal > Bot > Privileged Gateway Intents',
   );
-  client.user.setActivity(packageData.version);
 
   // Verify notification channel accessibility on startup
   const notifChannel = client.channels.cache.get(process.env.CHANNEL_ID);
