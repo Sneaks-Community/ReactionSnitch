@@ -4,6 +4,7 @@ import {
   GatewayIntentBits,
   Client,
   Partials,
+  resolveColor,
   Routes,
 } from "discord.js";
 import { readFileSync } from "node:fs";
@@ -67,6 +68,16 @@ function park(reason, error) {
 
 if (!process.env.DISCORD_TOKEN || !process.env.CHANNEL_ID) {
   park("Missing DISCORD_TOKEN or CHANNEL_ID");
+}
+
+// Cosmetic setting, so a bad value warns and falls back instead of parking.
+let embedColor = 9_442_302;
+if (process.env.EMBED_COLOR) {
+  try {
+    embedColor = resolveColor(process.env.EMBED_COLOR);
+  } catch {
+    logger.warn({ value: process.env.EMBED_COLOR }, "Invalid EMBED_COLOR, using default");
+  }
 }
 
 bot.on(Events.ClientReady, (client) => {
@@ -187,10 +198,6 @@ async function sendNotification(user, emoji, message) {
   const emojiDisplay = emoji.id
     ? `<:${emoji.name}:${emoji.id}>`
     : emoji.name;
-
-  const embedColor = process.env.EMBED_COLOR
-    ? Number.parseInt(process.env.EMBED_COLOR.replace("#", ""), 16)
-    : 9_442_302;
 
   const embed = new EmbedBuilder()
     .setTitle("Member has added a reaction")
