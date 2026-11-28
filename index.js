@@ -176,10 +176,30 @@ function shouldProcessReaction(messageId, userId, emojiName, emojiId) {
   return true;
 }
 
-// Periodically clean up the deduplication set to prevent unbounded memory growth.
-// We clear the entire set periodically. This is safe because reactions are
-// processed within seconds of occurring.
+// Caps notifications per user so one account can't flood the notification channel.
+// ponytail: fixed window per user; a sliding window if bursts at window edges matter.
+const FLOOD_LIMIT = 10;
+const FLOOD_WINDOW_MS = 60_000;
+const floodWindows = new Map();
+
+function floodCount(userId) {
+  const now = Date.now();
+  const entry = floodWindows.get(userId);
+  if (!entry || now - entry.start > FLOOD_WINDOW_MS) {
+    floodWindows.set(userId, { count: 1, start: now });
+    return 1;
+  }
+  return ++entry.count;
+}
+
+// Periodically drop expired flood windows, and clear the deduplication set once it
+// passes 10k entries (safe because reactions are processed within seconds).
 setInterval(() => {
+  const now = Date.now();
+  for (const [userId, entry] of floodWindows) {
+    if (now - entry.start > FLOOD_WINDOW_MS) floodWindows.delete(userId);
+  }
+
   if (processedReactions.size <= 10_000) return;
 
   processedReactions.clear();
@@ -225,6 +245,27 @@ async function sendNotification(user, emoji, message) {
     );
   }
 
+  await postEmbed(embed);
+}
+
+async function sendFloodNotice(user) {
+  await postEmbed(
+    new EmbedBuilder()
+      .setTitle("Reaction notifications paused for member")
+      .setColor(embedColor)
+      .setAuthor({
+        iconURL: user.displayAvatarURL({ forceStatic: false, size: 128 }),
+        name: user.tag,
+      })
+      .setDescription(
+        `${user} triggered more than ${FLOOD_LIMIT} notifications within ${FLOOD_WINDOW_MS / 1000}s. Their further reactions are not reported until the window resets.`,
+      )
+      .setFooter({ text: `ID: ${user.id}` })
+      .setTimestamp(),
+  );
+}
+
+async function postEmbed(embed) {
   const notifChannel = await getNotificationChannel(bot);
   if (!notifChannel) {
     logger.error(
@@ -289,6 +330,17 @@ bot.on(Events.MessageReactionAdd, async (reaction, user) => {
         { emojiId: reaction.emoji.id, emojiName: reaction.emoji.name, messageId: reaction.message.id, userId: user.id },
         "ReactionAdd: Duplicate — skipping",
       );
+      return;
+    }
+
+    const notified = floodCount(user.id);
+    if (notified > FLOOD_LIMIT) {
+      if (notified === FLOOD_LIMIT + 1) {
+        logger.warn({ userId: user.id }, "ReactionAdd: Flood cap reached, suppressing");
+        await sendFloodNotice(user);
+      } else {
+        logger.debug({ userId: user.id }, "ReactionAdd: Flood cap active, skipping");
+      }
       return;
     }
 
